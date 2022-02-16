@@ -184,6 +184,22 @@ tList <- lapply(tList, function(season) lapply(season, function(team) lapply(tea
 
 tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"posCheck"))))
 
+tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+  if("totRebOp" %in% names(alt)){
+    alt %>% mutate(possessionOp= alt$attempted2pOp + alt$attempted3pOp + alt$posCheckOp + alt$turnoverOp - alt$offRebOp)
+  }else{
+    alt
+  }))))
+
+tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+  if("totRebOp" %in% names(alt)){
+    alt %>% mutate(possession= alt$attempted2p + alt$attempted3p + alt$posCheck + alt$turnover - alt$offReb)
+  }else{
+    alt
+  }))))
+  
+
+
 
 
 saveRDS(tList,"processed_data.RDS")
