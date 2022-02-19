@@ -4,7 +4,7 @@ require(xgboost)
 
 tList <- readRDS("processed_data.RDS")
 
-cl <- makeCluster(detectCores())
+cl <- makeCluster(detectCores()) 
 clusterEvalQ(cl, require(tidyverse))
 clusterEvalQ(cl, require(parallel))
 
@@ -14,17 +14,19 @@ gameStats <- lapply(gameStats, function(season) lapply(season, function(team) la
 
 
 begin <- Sys.time()
-gameStats <- lapply(gameStats, function(season) parLapply(cl, season, function(team) lapply(team, function(games){
+gameStats <- parLapply(cl,gameStats, function(season) lapply(season, function(team) lapply(team, function(games){
   
-  isN <- colnames(games)[which(sapply(games,is.numeric))]
+  isN <- colnames(games)[which(sapply(games,function(x) is.numeric(x) | is.logical(x)))]
   games %>% group_by(CODETEAM) %>% summarise_at(.vars = isN,.funs = sum)
   
 }
   )))
 print(Sys.time() - begin)
 
+gameStats <-lapply(gameStats, function(season) lapply(season, function(team) lapply(team, function(games) games %>% filter(CODETEAM!="FALSE"))))
+gameStats <-lapply(gameStats, function(season) lapply(season, function(team) lapply(team, function(games) games %>% mutate(isHome= isHome > 0))))
 
-gameStats <-lapply(gameStats, function(season) lapply(season, function(team) team %>% bind_rows(.id = "opp") %>% filter(CODETEAM!="FALSE")))
+gameStats <-lapply(gameStats, function(season) lapply(season, function(team) team %>% bind_rows(.id = "opp")))
 gameStats <-lapply(gameStats, function(season) lapply(season, function(team) team %>% mutate(game_count=1:n()))) 
 gameStats <-lapply(gameStats, function(season) lapply(season, function(team) team %>% mutate(pts=3*made3p +2*made2p +madeFT,
                                                                                              oppPts=3*made3pOp + 2*made2pOp + madeFTOp,
@@ -49,7 +51,11 @@ gameStats <-lapply(gameStats, function(season) lapply(season, function(team)
 
 gameStats <-lapply(gameStats, function(season) lapply(season, function(team) 
   team %>% select(-c(MINUTE,POINTS_A,POINTS_B,quarter,timeNum))
-))   
+))  
+
+gs_win_home <- lapply(gameStats, function(season) lapply(season, function(team) 
+  team %>% select(CODETEAM,enc,opp,win,isHome)
+)) 
 
 
 
@@ -58,13 +64,22 @@ gameStats <-lapply(gameStats, function(season) lapply(season, function(team)
 #clusterEvalQ(cl, require(parallel))
 
 begin <- Sys.time()
-gameStats <- lapply(gameStats, function(season) parLapply(cl, season, function(team){
+gameStats2 <- parLapply(cl,gameStats, function(season) lapply(season, function(team){
   tmp <- lapply(team$game_count, function(x){
-    isN <- colnames(team)[which(sapply(team,is.numeric))]
+    isN <- colnames(team)[which(sapply(team, function(x) is.numeric(x) | is.logical(x)))]
     flt <- team %>% filter(game_count <= x)
     
+    col_no <- dim(flt)[2]
+    col_names <- colnames(flt)
+    
     if(dim(flt)[1] < 6){
-      flt <- flt %>% group_by(CODETEAM) %>% summarise_at(.vars = isN,.funs = mean)
+      
+      if(dim(flt)[1] != 0){
+        flt <- flt %>% group_by(CODETEAM) %>% summarise_at(.vars = isN,.funs = mean)
+      }else{
+        
+      }
+      
     }else{
       flt <- flt[((dim(flt)[1])-3):(dim(flt)[1]-1),]
       flt <- flt %>% group_by(CODETEAM) %>% summarise_at(.vars = isN,.funs = mean)
@@ -85,7 +100,7 @@ gameStats <- lapply(gameStats, function(season) parLapply(cl, season, function(t
 print(Sys.time() - begin)
 
 
-gameStats2 <- lapply(gameStats, function(season) lapply(season, function(team){
+gameStats2 <- lapply(gameStats2, function(season) lapply(season, function(team){
   team <- team %>% mutate(fg_2 = made2p/attempted2p,
                           fg_3 = made3p/attempted3p,
                           fg_ft = madeFT/attemptedFT,
@@ -100,8 +115,12 @@ gameStats2 <- lapply(gameStats, function(season) lapply(season, function(team){
   return(team)
 }))
 
+
+
 gS_names <- lapply(gameStats2,names)
 
+
+gameStats2 <- Map(function(season1,season2) Map(function(team1,team2) left_join(team1,team2,by=c("CODETEAM","opp","enc"),suffix = c("","_true") ),team1=season1,team2=season2),season1=gameStats2,season2=gs_win_home)
 
 ff <- function(a,b){
   
@@ -130,8 +149,8 @@ stats_other <- colnames(gameStats_merged)[which(colnames(gameStats_merged) %>% s
 stats_op <- colnames(gameStats_merged)[which(!colnames(gameStats_merged) %>% str_detect("_other")  &  (colnames(gameStats_merged) %>% str_detect("Op")))]
 stats_ <- colnames(gameStats_merged)[which(!colnames(gameStats_merged) %>% str_detect("_other")  &  !(colnames(gameStats_merged) %>% str_detect("Op")))]
 
-stats_ <- stats_[-(1:6)]
-stats_other <- stats_other[-(1:2)]
+stats_ <- stats_[-c((1:4),6,length(stats_),(length(stats_) -1))]
+stats_other <- stats_other[-c(1,length(stats_other),(length(stats_other) -1))]
 
 stats_idx <- sapply(stats_, function(x) sum(sapply(stats_other_op, function(y) y %>% str_detect(x) )))
 stats_op_idx <- sapply(stats_other %>% str_remove("_other"), function(x) sum(sapply(stats_op, function(y) y %>% str_detect(x) )))
@@ -164,6 +183,7 @@ for(x in 1:length(stats_other[stats_op_idx == 1])){
 
 
 gameStats_merged <- gameStats_merged %>% arrange(season,game_count)
+gameStats_merged <- gameStats_merged %>% filter(game_count > 1)
 
 
 gs_tt <- gameStats_merged[-((dim(gameStats_merged)[1]-50):(dim(gameStats_merged)[1])),]
@@ -174,8 +194,8 @@ gs_pred <- gameStats_merged[((dim(gameStats_merged)[1]-50):(dim(gameStats_merged
 ####xgboost####
 
 
-gs_tt <- gs_tt[,c(stats_,stats_op,stats_other,stats_other_op)]
-gs_pred <- gs_pred[,c(stats_,stats_op,stats_other,stats_other_op)]
+gs_tt <- gs_tt[,c(stats_,stats_op,stats_other,stats_other_op,"isHome")]
+gs_pred <- gs_pred[,c(stats_,stats_op,stats_other,stats_other_op,"isHome")]
 
 pts_tt <- gs_tt$pts
 pts_pred <- gs_pred$pts
@@ -195,8 +215,8 @@ xgbTest <- xgb.DMatrix(data = testMatrix,label=pts_tt[-index.test])
 
 xgb_model_full <- xgb.train(params = list(
   booster="gbtree",
-  eta=0.01,
-  max_depth=10,
+  eta=0.001,
+  max_depth=30,
   gamma=10,
   subsample=0.828,
   colsample_bytree=0.837,

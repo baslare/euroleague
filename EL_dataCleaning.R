@@ -5,11 +5,11 @@ source("EL_functions.R")
 
 
 
-seasons_list <- readRDS("all_seasons.RDS")
+seasons_list <- readRDS("el_raw.rds")
 
 
 
-parsed_season <- lapply(seasons_list, function(y) lapply(y, function(x){
+parsed_season <- lapply(seasons_list[3:10], function(y) lapply(y, function(x){
   
   home <- x$header$CodeTeamA
   away <- x$header$CodeTeamB
@@ -35,6 +35,19 @@ parsed_season <- lapply(parsed_season, function(y) lapply(y, function(x){
   
 }))
 
+
+parsed_season <- lapply(parsed_season, function(y) lapply(y, function(x){
+  
+  home <- x$header$CodeTeamA
+  away <- x$header$CodeTeamB
+  
+  x[[paste(home)]]$isHome <- x[[paste(home)]]$CODETEAM %>% str_trim() == home
+  x[[paste(away)]]$isHome <- x[[paste(away)]]$CODETEAM %>% str_trim() == home
+  
+  return(x)
+  
+}))
+
 st_list <- list()
 
 invisible(Map(function(y,z){
@@ -49,6 +62,8 @@ invisible(Map(function(y,z){
     
     home_add <- list(list(team=x[[paste(home)]],opp=x[[paste(away)]]))
     away_add <- list(list(team=x[[paste(away)]],opp=x[[paste(home)]]))
+    
+    
     
     names(home_add) <- away
     names(away_add) <- home

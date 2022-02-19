@@ -4,7 +4,7 @@ require(tidyverse)
 setwd("C:/Users/Efe/Desktop/Projeler/euroleague/")
 
 
-season <- 2021
+season <- 2020
 all_seasons <- list()
 
 while(season <= 2021){

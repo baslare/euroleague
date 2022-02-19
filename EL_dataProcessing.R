@@ -8,7 +8,11 @@ source("EL_functions.R")
 st_list <- readRDS("st_list.rds")
 players_hash <- readRDS("players_hash.rds")
 
+cl <- makeCluster(detectCores())
 
+clusterEvalQ(cl, require(parallel))
+clusterEvalQ(cl, source("EL_functions.R"))
+clusterEvalQ(cl, require(tidyverse))
 
 #### Tidy ####
 
@@ -19,7 +23,27 @@ tList <- lapply(tList, function(season) lapply(season, function(team) lapply(tea
   alt %>% rename(event=PLAYTYPE)))))
 
 tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt) 
-  alt %>% mutate(timeNum= unlist(sapply(sapply(alt$MARKERTIME,function(x) x %>% str_split(":")), function(y) as.numeric(y[[1]])*60 + as.numeric(y[[2]]))))))))
+  alt %>% mutate(event= plyr::mapvalues(event ,from = c("2FGAB","LAYUPATT","LAYUPMD","DUNK"),to = c("2FGA","2FGA","2FGM","2FGM")))))))
+
+tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt) {
+  wrong_idx <- which(!(alt$MARKERTIME %>% str_detect(":")))
+  
+  sapply(wrong_idx, function(x){
+    
+    mrkr <- c(alt$MARKERTIME[-1],"00:00")
+    
+    alt$MARKERTIME[wrong_idx] <<- mrkr[wrong_idx]
+    
+  })
+  
+  return(alt)
+}
+  ))))
+
+
+
+tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt) 
+  alt %>% mutate(timeNum= try(sapply(sapply(alt$MARKERTIME,function(x) x %>% str_split(":")), function(y) as.numeric(y[[1]])*60 + as.numeric(y[[2]]))))))))
 
 tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt) 
   alt %>% mutate(duration = mapply(function(x,y,z){
@@ -72,69 +96,75 @@ tList <- lapply(tList, function(season) lapply(season, function(team) lapply(tea
   alt %>% mutate(fiveChar = sapply(five, function(x) str_c(x[1],x[2],x[3],x[4],x[5],sep="; ")))))))
 
 tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
-  alt %>% mutate(fiveCheck = mapply(function(x,y) x == y, x=alt$fiveChar, y=c(alt$fiveChar[-1],"")))))))
+  alt %>% mutate(fiveCheck = mapply(function(x,y) x == y, x=alt$five_id, y=c(alt$five_id[-1],"")))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+
+
+
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(assist= sapply(alt$event, function(x) ifelse(x=="AS",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(turnover= sapply(alt$event, function(x) ifelse(x=="TO",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(made3p= sapply(alt$event, function(x) ifelse(x=="3FGM",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(attempted3p= sapply(alt$event, function(x) ifelse(x=="3FGA" | x=="3FGM",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(made2p= sapply(alt$event, function(x) ifelse(x=="2FGM",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(attempted2p= sapply(alt$event, function(x) ifelse(x=="2FGA" | x== "2FGM",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(madeFT= sapply(alt$event, function(x) ifelse(x=="FTM",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(attemptedFT= sapply(alt$event, function(x) ifelse(x=="FTA" | x=="FTM",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(defReb= sapply(alt$event, function(x) ifelse(x=="D",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(offReb= sapply(alt$event, function(x) ifelse(x=="O",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(totReb= sapply(alt$event, function(x) ifelse(x=="O" | x== "D",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(foulDrawn= sapply(alt$event, function(x) ifelse(x=="RV",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(foul= sapply(alt$event, function(x) ifelse(x=="CM",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(block= sapply(alt$event, function(x) ifelse(x=="FV",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(rejected= sapply(alt$event, function(x) ifelse(x=="AG",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(steal= sapply(alt$event, function(x) ifelse(x=="ST",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(oFoul= sapply(alt$event, function(x) ifelse(x=="OF",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(tFoul= sapply(alt$event, function(x) ifelse(x=="CMT",1,0)))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
-  alt %>% mutate(cumSec=cumsum(alt$duration))))))
-
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% select(-c(TYPE,NUMBEROFPLAY,TEAM,DORSAL,PLAYINFO))))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt){
+
+tList <- parLapply(cl,tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+  alt %>% mutate(cumSec=cumsum(alt$duration))))))
+
+
+
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt){
   alt[dim(alt)[1]+1,] <- FALSE
   alt$cumSec[dim(alt)[1]] <- max(alt$MINUTE,na.rm = T)*60
   alt$duration[dim(alt)[1]] <- alt$cumSec[dim(alt)[1]] - alt$cumSec[dim(alt)[1]-1]
@@ -147,6 +177,7 @@ tList <- lapply(tList, function(season) lapply(season, function(team) lapply(tea
   alt$P3[dim(alt)[1]] <- alt$P3[dim(alt)[1] -1]
   alt$P4[dim(alt)[1]] <- alt$P4[dim(alt)[1] -1]
   alt$P5[dim(alt)[1]] <- alt$P5[dim(alt)[1] -1]
+  alt$isHome[dim(alt)[1]] <- alt$isHome[dim(alt)[1] -1]
   return(alt)
 }
    ))))
@@ -155,43 +186,46 @@ tList <- lapply(tList, function(season) lapply(season, function(team) lapply(tea
 
 
 
+
+
 #running the next part in parallel makes it run more than two times faster
 
-cl <- makeCluster(detectCores())
-
-clusterEvalQ(cl, require(parallel))
-clusterEvalQ(cl, source("EL_functions.R"))
-clusterEvalQ(cl, require(tidyverse))
-
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"assist"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"turnover"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"made3p"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"attempted3p"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"made2p"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"attempted2p"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"madeFT"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"attemptedFT"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"defReb"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"offReb"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"totReb"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"steal"))))
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) opp_oFoul(game[[1]],game[[2]]))))
 
 
+begin <- Sys.time()
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"assist"))))
+message(Sys.time() - begin)
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+begin <- Sys.time()
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"turnover"))))
+message(Sys.time() - begin)
+
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"made3p"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"attempted3p"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"made2p"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"attempted2p"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"madeFT"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"attemptedFT"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"defReb"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"offReb"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"totReb"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"steal"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) opp_oFoul(game[[1]],game[[2]]))))
+
+
+
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   alt %>% mutate(posCheck=as.numeric(posChecker))))))
 
-tList <- lapply(tList, function(season) parLapply(cl, season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"posCheck"))))
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(game) oppStat(game[[1]],game[[2]],"posCheck"))))
 
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+tList <- parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   if("totRebOp" %in% names(alt)){
     alt %>% mutate(possessionOp= alt$attempted2pOp + alt$attempted3pOp + alt$posCheckOp + alt$turnoverOp - alt$offRebOp)
   }else{
     alt
   }))))
-
-tList <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
+parLapply(cl, tList, function(season) lapply(season, function(team) lapply(team, function(games) lapply(games, function(alt)
   if("totRebOp" %in% names(alt)){
     alt %>% mutate(possession= alt$attempted2p + alt$attempted3p + alt$posCheck + alt$turnover - alt$offReb)
   }else{
