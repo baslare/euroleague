@@ -71,7 +71,7 @@ u2pteam <- lapply(unas2pteam, bind_rows)
 
 ## ratios for assisted - unassisted 2p
 ratios <- mapply(function(x,y) full_join(x,y,by=c("PLAYER_ID","team")),x=a2p,y=u2p,SIMPLIFY = F)
-ratios <-  lapply(ratios, function(y) y <- lapply(y, function(x) replace_na(x,0)))
+ratios <-  lapply(ratios, function(y) y %>% mutate_if(is.numeric,replace_na,replace=0))
 ratios <- lapply(ratios, function(x) setNames(x,c("PLAYER_ID","team","assisted2P","unassisted2P")))
 ratios <- lapply(ratios, function(x) data.frame(x))
 ratios <- lapply(ratios, function(x) x %>% mutate(a2p_ratio = assisted2P/(assisted2P+unassisted2P)))
@@ -102,7 +102,7 @@ u3pteam <- lapply(unas3pteam, bind_rows)
 ## ratios for assisted - unassisted 3p
 
 ratios3 <- mapply(function(x,y) full_join(x,y,by=c("PLAYER_ID","team")),x=a3p,y=u3p,SIMPLIFY = F)
-ratios3 <-  lapply(ratios3, function(y) y <- lapply(y, function(x) replace_na(x,0)))
+ratios3 <-  lapply(ratios3, function(y) y %>% mutate_if(is.numeric,replace_na,replace=0))
 ratios3 <- lapply(ratios3, function(x) setNames(x,c("PLAYER_ID","team","assisted3P","unassisted3P")))
 ratios3 <- lapply(ratios3, function(x) data.frame(x))
 ratios3 <- lapply(ratios3, function(x) x %>% mutate(a3p_ratio = assisted3P/(assisted3P+unassisted3P)))
@@ -115,9 +115,9 @@ team3p <- lapply(team3p, function(x) x %>% mutate(a3p_ratio = assisted3P/(assist
 team3p <- mapply(function(x,y) x %>% mutate(season=y), x=team3p,y=names(assist_list),SIMPLIFY = F)
 
 players <- mapply(function(x,y) full_join(x,y,by=(c("PLAYER_ID","team","season"))),x=ratios,y=ratios3,SIMPLIFY = F)
-players <- lapply(players, function(x) lapply(x, function(y) y %>% replace_na(0)))
+players <- lapply(players, function(x) x %>% mutate_if(is.numeric, replace_na, replace=0))
 teams <- mapply(function(x,y) full_join(x,y,by=c("team","season")),x=team2p,y=team3p,SIMPLIFY = F)
-teams <- lapply(teams, function(x) lapply(x, function(y) y %>% replace_na(0)))
+teams <- lapply(teams, function(x) x %>% mutate_if(is.numeric, replace_na, replace=0))
 
 
 playersDF <- players %>% bind_rows()

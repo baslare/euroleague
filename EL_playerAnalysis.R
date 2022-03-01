@@ -7,10 +7,6 @@ allFives <- readRDS("allLineups.rds")
 players_hash <- readRDS("players_hash.rds")
 playersDF_as <- readRDS("playersDF_as.rds")
 
-plnames <- unique(dnm$PLAYER_ID)
-plnames <- plnames[-which(plnames=="")]
-
-
 
 cl <- makeCluster(detectCores())
 clusterEvalQ(cl, require(tidyverse))
@@ -23,7 +19,7 @@ aggPlayers <- parLapply(cl, tList, function(season) lapply(season, function(team
 
 
 aggPlayers <- lapply(aggPlayers, function(season) lapply(season, function(team) lapply(team, function(games) 
-  games[[1]])))
+  games[[1]] %>% mutate(games_played=1))))
 
 aggPlayers <- lapply(aggPlayers, function(season) lapply(season, function(team) 
   team %>% bind_rows))
@@ -99,7 +95,7 @@ for(x in colnames_saved[5:22]){
   var1 <- x
   var2 <- paste0("team_",x)
   
-  aggPlayers <- aggPlayers %>% mutate(!!varName := aggPlayers[[var1]]/aggPlayers[[var2]])
+  aggPlayers <- aggPlayers %>% mutate(!!varName := aggPlayers[[all_of(var1)]]/aggPlayers[[all_of(var2)]])
   aggPlayers <- aggPlayers %>% relocate(!!varName, .after=var1)
   
 }
@@ -135,10 +131,18 @@ minutes <- aggPlayers$duration/60
 aggPlayers$minute <- minutes
 
 aggPlayers <- aggPlayers %>% mutate_if(.predicate = is.numeric, ~round(.,digits=2))
+aggPlayers <- aggPlayers %>% relocate(games_played,.after = season)
+
+aggPlayers <- aggPlayers %>% mutate(mpg = minute/games_played,
+                                  ppg = pts/games_played,
+                                  apg = assist/games_played,
+                                  rpg = (defReb + offReb)/games_played,
+                                  topg = turnover/games_played)
 
 
-to_display <- c("display","team","season",
-                "minute","usage","ppp",
+
+to_display <- c("display","team","season","games_played",
+                "mpg","usage","ppp", "pts", "ppg","apg","rpg","topg",
                 "tsRatio","ratio2P","ratio3P",
                 "FTratio" ,"a2p_ratio", "a3p_ratio",
                 "assist","assist_s","turnover",
@@ -151,12 +155,17 @@ to_display <- c("display","team","season",
                 "foulDrawn_s","foul","foul_s",
                 "block","block_s","steal",
                 "steal_s", "oFoulOp",
-                "oFoul","tFoul")
+                "oFoul","tFoul","minute")
+
+aggPlayers <- aggPlayers %>% mutate_if(.predicate = is.numeric, ~round(.,digits=2))
 
 AP_to_csv <- aggPlayers %>% select(to_display)
-AP_to_csv <- AP_to_csv %>% rename(PLAYERS=display)
+AP_to_csv <- AP_to_csv %>% rename(PLAYERS=display,
+                                  usg=usage)
+
 
 saveRDS(AP_to_csv,"AP_to_sql.rds")
+write.csv(AP_to_csv,"AP_to_sql.csv",fileEncoding = "utf-8",row.names = FALSE)
   
   
 parallel::stopCluster(cl)
