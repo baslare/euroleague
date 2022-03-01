@@ -6,7 +6,7 @@ require(igraph)
 
 
 st_list <- readRDS("st_list.RDS")
-season <- "2021"
+
 
 allTeams <- lapply(st_list, function(w) lapply(w, function(x) lapply(x, function(y) y[[1]])))
 allTeams <- lapply(allTeams, function(w) lapply(w, function(x) lapply(x, as.data.frame)))

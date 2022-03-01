@@ -4,9 +4,10 @@ tList <- readRDS("processed_data.RDS")
 
 
 isN <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(games) sapply(games, function(cols) sapply(cols, is.numeric)))))
-aggTeams <- mapply(function(m,n) mapply(function(a,b) mapply(function(p,r) list(mapply(function(x,y) x %>% group_by(five_id) %>% summarise_if(.predicate = y[-(length(y))],.funs = sum) , x=p,y=r)),p=a,r=b),a=m,b=n),m=tList,n=isN,SIMPLIFY = F)
+aggTeams <- mapply(function(m,n) mapply(function(a,b) mapply(function(p,r) list(mapply(function(x,y) x %>% group_by(five_id) %>% summarise_if(.predicate = is.numeric,.funs = sum) , x=p,y=r)),p=a,r=b),a=m,b=n),m=tList,n=isN,SIMPLIFY = F)
 
-
+aggTeams <- lapply(tList, function(season) lapply(season, function(team) lapply(team, function(game) lapply(game, function(x) x %>% group_by(five_id) %>% summarise_if(is.numeric,sum)))))
+aggTeams[["2018"]] <- aggTeams[["2018"]][-c((length(aggTeams[["2018"]])-3):(length(aggTeams[["2018"]])))]
 aggTeams <- lapply(aggTeams, function(season) lapply(season, function(team) lapply(team, function(game) game[[1]])))
 aggTeams <- lapply(aggTeams, function(season) lapply(season, function(team) team %>% bind_rows))
 aggTeams <- lapply(aggTeams, function(season) lapply(season, function(team) team %>% mutate(possessionOp= team$attempted2pOp + team$attempted3pOp + team$posCheckOp + team$turnoverOp - team$offRebOp)))

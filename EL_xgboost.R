@@ -185,6 +185,7 @@ for(x in 1:length(stats_other[stats_op_idx == 1])){
 gameStats_merged <- gameStats_merged %>% arrange(season,game_count)
 gameStats_merged <- gameStats_merged %>% filter(game_count > 1)
 
+g
 
 gs_tt <- gameStats_merged[-((dim(gameStats_merged)[1]-50):(dim(gameStats_merged)[1])),]
 gs_pred <- gameStats_merged[((dim(gameStats_merged)[1]-50):(dim(gameStats_merged)[1])),]
@@ -194,14 +195,16 @@ gs_pred <- gameStats_merged[((dim(gameStats_merged)[1]-50):(dim(gameStats_merged
 ####xgboost####
 
 
-gs_tt <- gs_tt[,c(stats_,stats_op,stats_other,stats_other_op,"isHome")]
-gs_pred <- gs_pred[,c(stats_,stats_op,stats_other,stats_other_op,"isHome")]
+#gs_tt <- gs_tt[,c(stats_,stats_op,stats_other,stats_other_op,"isHome","win_true")]
+#gs_pred <- gs_pred[,c(stats_,stats_op,stats_other,stats_other_op,"isHome","win_true")]
+
+
 
 pts_tt <- gs_tt$pts
 pts_pred <- gs_pred$pts
 
-gs_tt <- gs_tt %>% select(-c("oppPts","pts_other","oppPts_other","pts"))
-gs_pred <- gs_pred %>% select(-c("oppPts","pts_other","oppPts_other","pts"))
+gs_tt <- gs_tt %>% select(-c("oppPts","pts_other","oppPts_other","pts","win_true","win_other","season","CODETEAM","opp","game_count","enc","win_true_other"))
+gs_pred <- gs_pred %>% select(-c("oppPts","pts_other","oppPts_other","pts","win_true","win_other","season","CODETEAM","opp","game_count","enc","win_true_other"))
 
 
 
@@ -220,8 +223,8 @@ xgb_model_full <- xgb.train(params = list(
   gamma=10,
   subsample=0.828,
   colsample_bytree=0.837,
-  objective="reg:squarederror",
-  eval_metric="rmse",
+  objective="binary:logistic",
+  eval_metric="auc",
   num_class=1
   
 ),data=xgbTrain,
