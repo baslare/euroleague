@@ -79,7 +79,13 @@ aggOther <- aggOther %>% select(-c(assistOp:attemptedFTOp,stealOp,oFoulOp,posChe
 colnames_saved <- colnames(aggOther)
 colnames(aggOther)[-c(1:4)] <- str_c("team_",colnames(aggOther)[-c(1:4)])
 
+
+####backup here####
+
 aP_backup <- aggPlayers
+
+
+###################
 aggPlayers <- left_join(aggPlayers,aggOther,by=c("PLAYER_ID","team","season"))
 aggPlayers <- aggPlayers %>% relocate(player_name,.before = assist)
 aggPlayers$defReb_pct <- aggPlayers$defReb/(aggPlayers$team_defReb+aggPlayers$team_offRebOp)
@@ -118,7 +124,7 @@ spl_ <- aggPlayers$player_name%>% str_split("[,]")
 
 
 
-aggPlayers$display <- sapply(spl_, function(x) str_to_title(paste(x[[2]],x[[1]])))
+aggPlayers$display <- sapply(spl_, function(x) str_to_title(paste(x[[2]],x[[1]]))) %>% str_trim()
 
 aggPlayers <- aggPlayers %>% mutate(tsRatio = pts/(2*(attempted2p + attempted3p + posCheck)),
                                     ratio2P = made2p/attempted2p,
@@ -130,7 +136,7 @@ aggPlayers <- aggPlayers %>% mutate(tsRatio = pts/(2*(attempted2p + attempted3p 
 minutes <- aggPlayers$duration/60
 aggPlayers$minute <- minutes
 
-aggPlayers <- aggPlayers %>% mutate_if(.predicate = is.numeric, ~round(.,digits=2))
+#aggPlayers <- aggPlayers %>% mutate_if(.predicate = is.numeric, ~round(.,digits=2))
 aggPlayers <- aggPlayers %>% relocate(games_played,.after = season)
 
 aggPlayers <- aggPlayers %>% mutate(mpg = minute/games_played,
@@ -157,11 +163,13 @@ to_display <- c("display","team","season","games_played",
                 "steal_s", "oFoulOp",
                 "oFoul","tFoul","minute")
 
-aggPlayers <- aggPlayers %>% mutate_if(.predicate = is.numeric, ~round(.,digits=2))
+aggPlayers_ <- aggPlayers %>% mutate_if(.predicate = is.numeric, ~round(.,digits=2))
 
-AP_to_csv <- aggPlayers %>% select(to_display)
+AP_to_csv <- aggPlayers_ %>% select(to_display)
 AP_to_csv <- AP_to_csv %>% rename(PLAYERS=display,
                                   usg=usage)
+
+AP_to_csv <- AP_to_csv %>% mutate_if(is.numeric,replace_na,replace=0)
 
 
 saveRDS(AP_to_csv,"AP_to_sql.rds")
