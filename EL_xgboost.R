@@ -2,6 +2,19 @@ require(tidyverse)
 require(parallel)
 require(xgboost)
 
+
+ff <- function(a,b){
+  
+  idx <- which(b$opp == a)
+  if(length(idx) > 0){
+    return(b[idx,])
+  }else{
+    return(NULL)
+  }
+  
+  
+}
+
 tList <- readRDS("processed_data.RDS")
 
 cl <- makeCluster(detectCores()) 
@@ -122,17 +135,7 @@ gS_names <- lapply(gameStats2,names)
 
 gameStats2 <- Map(function(season1,season2) Map(function(team1,team2) left_join(team1,team2,by=c("CODETEAM","opp","enc"),suffix = c("","_true") ),team1=season1,team2=season2),season1=gameStats2,season2=gs_win_home)
 
-ff <- function(a,b){
-  
-  idx <- which(b$opp == a)
-  if(length(idx) > 0){
-    return(b[idx,])
-  }else{
-    return(NULL)
-  }
-  
-  
-}
+
 
 gameStats_others <- Map(function(name,df) lapply(name, function(y) lapply(df, function(x) ff(y,x))),name=gS_names,df=gameStats2)
 gameStats_others <- Map(function(x,y) setNames(x,y),x=gameStats_others,y=gS_names)
@@ -143,6 +146,19 @@ gameStats_merged <- Map(function(x,y) Map(function(a,b) left_join(a %>% mutate(a
 
 gameStats_merged <- lapply(gameStats_merged, bind_rows)
 gameStats_merged <- gameStats_merged %>% bind_rows(.id = "season")  
+
+
+
+#### table ####
+
+pre_table <- lapply(gameStats, function(x) x  %>% bind_rows(.id = "CODETEAM"))
+pre_table <- pre_table[["2021"]]
+pre_table <- pre_table %>% filter(!(str_detect(CODETEAM,"DYR|UNK|CSK") | str_detect(opp,"DYR|UNK|CSK")))
+
+pre_table <- pre_table %>% select(CODETEAM,assist:oppPts,win)
+pre_table <- pre_table %>% group_by(CODETEAM) %>% mutate(game_count=1) %>% summarise_if(is.numeric,sum)
+
+#### model cont. ####
   
 stats_other_op <- colnames(gameStats_merged)[which(colnames(gameStats_merged) %>% str_detect("_other")  &  (colnames(gameStats_merged) %>% str_detect("Op")))]
 stats_other <- colnames(gameStats_merged)[which(colnames(gameStats_merged) %>% str_detect("_other")  &  !(colnames(gameStats_merged) %>% str_detect("Op")))] 

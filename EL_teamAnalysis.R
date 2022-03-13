@@ -54,3 +54,7 @@ to_display <- c("team","season","games_played","ppp","pppOp","pace","tsRatio","r
                 "attemptedFTOp", "defRebOp","offRebOp","totRebOp","stealOp","possession","possessionOp")
 
 allTeams <- allTeams %>% select(to_display)
+
+allTeams <- allTeams %>% mutate_if(.predicate = is.numeric, ~round(.,digits=2))
+
+write.csv(allTeams,"allTeams.csv",fileEncoding = "utf-8",row.names = FALSE)
